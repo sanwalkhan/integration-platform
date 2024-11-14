@@ -1,31 +1,50 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const fs = require('fs');
+const session = require('express-session');
+const https = require('https');
 const passport = require('passport');
 const dotenv = require('dotenv');
-const cors = require('cors');
-const session = require('express-session');
+const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
 
 // Load environment variables
 dotenv.config();
+require('./config/passport');
 
-// Initialize app
+// Connect to the database
+connectDB();
+
 const app = express();
-
-// Middleware
-app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize()); // Initialize Passport.js
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET, 
+  resave: true, 
+  saveUninitialized: true
+}));
+
+// Initialize Passport.js
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Routes
-const authRoutes = require('./routes/authRoutes');
 app.use('/auth', authRoutes);
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log(err));
+// HTTPS server setup
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
+  const options = {
+    key: fs.readFileSync('path/to/your/server.key'), // Path to your private key
+    cert: fs.readFileSync('path/to/your/server.cert'), // Path to your certificate
+    // If using a CA-signed certificate, you may also need to specify the CA
+    // ca: fs.readFileSync('path/to/your/ca.cert')
+  };
 
-// Start server
-const port = process.env.PORT || 5000;
-app.listen(port, () => console.log(`Server running on port ${port}`));
+  https.createServer(options, app).listen(process.env.PORT, () => {
+    console.log(`Server running on https://localhost:${process.env.PORT}`);
+  });
+} else {
+  app.listen(process.env.PORT, () => {
+    console.log(`Server running on http://localhost:${process.env.PORT}`);
+  });
+}
