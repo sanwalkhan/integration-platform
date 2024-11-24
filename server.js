@@ -1,50 +1,63 @@
 const express = require('express');
-const fs = require('fs');
 const session = require('express-session');
-const https = require('https');
 const passport = require('passport');
-const dotenv = require('dotenv');
-const connectDB = require('./config/db');
+const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
-
-// Load environment variables
-dotenv.config();
+const connectDB = require('./config/db');
+require('dotenv').config();
 require('./config/passport');
+const hubspotRoutes = require('./routes/hubspotRoutes');
+const sapRoutes = require('./routes/sapRoutes');
+const companyRoutes = require('./routes/companyRoutes'); 
+const integrationRoutes = require('./routes/integration');
 
-// Connect to the database
-connectDB();
+
 
 const app = express();
-app.use(express.json());
 
-// Session configuration
+// Connect to database
+connectDB();
+
+// Middleware
+app.use(express.json());
+app.use(cors());
 app.use(session({
-  secret: process.env.SESSION_SECRET, 
-  resave: true, 
-  saveUninitialized: true
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
-// Initialize Passport.js
+// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/hubspot', hubspotRoutes);
+app.use('/api', integrationRoutes);
 
-// HTTPS server setup
-if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
-  const options = {
-    key: fs.readFileSync('path/to/your/server.key'), // Path to your private key
-    cert: fs.readFileSync('path/to/your/server.cert'), // Path to your certificate
-    // If using a CA-signed certificate, you may also need to specify the CA
-    // ca: fs.readFileSync('path/to/your/ca.cert')
-  };
 
-  https.createServer(options, app).listen(process.env.PORT, () => {
-    console.log(`Server running on https://localhost:${process.env.PORT}`);
-  });
-} else {
-  app.listen(process.env.PORT, () => {
-    console.log(`Server running on http://localhost:${process.env.PORT}`);
-  });
-}
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+module.exports = app;
+

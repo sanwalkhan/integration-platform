@@ -1,51 +1,133 @@
+
+// const passport = require('passport');
+// const LocalStrategy = require('passport-local').Strategy;
+// const User = require('../models/User');
+
+// // Local strategy for authentication
+// passport.use(
+//   new LocalStrategy(
+//     { usernameField: 'workEmail' }, 
+//     async (workEmail, password, done) => {
+//       try {
+//         const user = await User.findOne({ workEmail });
+//         if (!user) return done(null, false, { message: 'Invalid credentials' });
+
+//         const isMatch = await user.comparePassword(password);
+//         if (!isMatch) return done(null, false, { message: 'Invalid credentials' });
+
+//         return done(null, user);
+//       } catch (err) {
+//         return done(err);
+//       }
+//     }
+//   )
+// );
+
+// // Serialize and deserialize user (to store user data in session)
+// passport.serializeUser((user, done) => done(null, user.id));
+// passport.deserializeUser(async (id, done) => {
+//   const user = await User.findById(id);
+//   done(null, user);
+// });
+
+
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const { OIDCStrategy } = require('passport-azure-ad');
-const User = require('../models/user');
+const MicrosoftStrategy = require('passport-microsoft').Strategy;
+const LocalStrategy = require('passport-local').Strategy;
+const User = require('../models/User');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+// Local strategy for authentication
+passport.use(
+  new LocalStrategy(
+    { usernameField: 'workEmail' },
+    async (workEmail, password, done) => {
+      try {
+        const user = await User.findOne({ workEmail });
+        if (!user) return done(null, false, { message: 'Invalid credentials' });
+
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) return done(null, false, { message: 'Invalid credentials' });
+
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    }
+  )
+);
+
 
 passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `${process.env.BASE_URL}/auth/google/callback`,
-}, async (token, tokenSecret, profile, done) => {
-  const existingUser = await User.findOne({ googleId: profile.id });
-  if (existingUser) {
-    return done(null, existingUser);
-  } else {
-    const newUser = new User({
-      googleId: profile.id,
-      name: profile.displayName,
-      email: profile.emails[0].value,
-      profilePicture: profile.photos ? profile.photos[0].value : '',
-      isEmailVerified: true, // Automatically verified if logging in via Google
-    });
-    await newUser.save();
-    return done(null, newUser);
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/api/auth/google/callback",
+    proxy: true
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      let user = await User.findOne({ googleId: profile.id });
+      if (!user) {
+        user = new User({
+          googleId: profile.id,
+          workEmail: profile.emails[0].value,
+          firstName: profile.name.givenName,
+          lastName: profile.name.familyName,
+          isEmailVerified: true,
+          profilePicture: profile.photos[0].value
+        });
+        await user.save();
+      }
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
   }
-}));
+));
 
-// passport.use(new OIDCStrategy({
-//   clientID: process.env.MICROSOFT_CLIENT_ID,
-//   clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-//   callbackURL: `${process.env.BASE_URL}/auth/microsoft/callback`, // Should be valid HTTPS
-//   identityMetadata: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID}/.well-known/openid-configuration`,
-//   responseType: 'code id_token',
-//   responseMode: 'query',
-//   scope: ['openid', 'profile', 'email'],
-// }, async (iss, sub, profile, accessToken, refreshToken, done) => {
-//   const existingUser = await User.findOne({ microsoftId: profile.id });
-//   if (existingUser) {
-//     return done(null, existingUser);
-//   } else {
-//     const newUser = new User({
-//       microsoftId: profile.id,
-//       name: profile.displayName,
-//       email: profile.upn,
-//       profilePicture: profile.picture || '',
-//       isEmailVerified: true, 
-//     });
-//     await newUser.save();
-//     return done(null, newUser);
-//   }
-// }));
+passport.use(new MicrosoftStrategy({
+    clientID: process.env.MICROSOFT_CLIENT_ID,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    callbackURL: process.env.MICROSOFT_CALLBACK_URL,
+    scope: ['user.read'],
+    tenant: 'common'
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      let user = await User.findOne({ microsoftId: profile.id });
+      if (!user) {
+        user = new User({
+          microsoftId: profile.id,
+          workEmail: profile.emails[0].value,
+          firstName: profile.name.givenName,
+          lastName: profile.name.familyName,
+          isEmailVerified: true,
+          profilePicture: profile._json.picture
+        });
+        await user.save();
+      }
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }
+));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+module.exports = passport;
 
