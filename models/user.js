@@ -4,12 +4,13 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: function () { return !this.googleId && !this.microsoftId; } },
+  password: { type: String, required: function () { return !this.googleId && !this.microsoftId && !this.hubspotId; } },
   googleId: { type: String },
   microsoftId: { type: String },
-  profilePicture: { type: String },
-  isEmailVerified: { type: Boolean, default: false },
-  emailVerificationToken: { type: String },
+  hubspotId: { type: String }, // HubSpot User ID
+  hubspotAccessToken: { type: String }, // OAuth Access Token
+  hubspotRefreshToken: { type: String }, // OAuth Refresh Token
+  hubspotExpiresAt: { type: Date }, // Token Expiry
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
@@ -19,12 +20,8 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-userSchema.methods.validatePassword = function (password) {
-  return bcrypt.compare(password, this.password);
-};
-
 const User = mongoose.model('User', userSchema);
-module.exports = User;// models/User.js
+module.exports = User;
 
 
 
