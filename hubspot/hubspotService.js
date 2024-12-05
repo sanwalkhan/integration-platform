@@ -1,24 +1,34 @@
-// services/hubspotService.js
 const axios = require('axios');
+const dotenv = require('dotenv');
+const User = require('../models/User'); // Import User model
 
-exports.getContacts = async (apiKey) => {
+dotenv.config();
+
+const BASE_URL = 'https://api.hubapi.com';
+
+const getAccessToken = (userId) => {
+  return User.findById(userId).then(user => user.hubspotAccessToken);
+};
+
+// Fetch contacts from HubSpot and associate them with the user
+const getContacts = async (userId) => {
+  const accessToken = await getAccessToken(userId);
+  const url = `${BASE_URL}/crm/v3/objects/contacts`;
+
   try {
-    const response = await axios.get('https://api.hubapi.com/crm/v3/objects/contacts', {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
     });
-    return response.data.results;
+
+    // Store the contacts with the user data in your database if needed
+    const contacts = response.data.results;
+    return contacts;
   } catch (error) {
-    throw new Error('Error fetching contacts from HubSpot');
+    throw new Error(`Failed to fetch contacts for user: ${error.message}`);
   }
 };
 
-exports.getCompanies = async (apiKey) => {
-  try {
-    const response = await axios.get('https://api.hubapi.com/crm/v3/objects/companies', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return response.data.results;
-  } catch (error) {
-    throw new Error('Error fetching companies from HubSpot');
-  }
-};
+module.exports = { getContacts };

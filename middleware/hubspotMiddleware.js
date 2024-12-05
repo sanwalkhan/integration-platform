@@ -5,7 +5,7 @@ exports.refreshHubSpotToken = async (req, res, next) => {
   try {
     const user = req.user;
 
-    if (new Date() > new Date(user.hubspotExpiresAt)) {
+    if (new Date() > new Date(user.hubspotExpiresAt)) { // Check if token is expired
       const tokenResponse = await axios.post('https://api.hubapi.com/oauth/v1/token', null, {
         params: {
           grant_type: 'refresh_token',
@@ -17,14 +17,16 @@ exports.refreshHubSpotToken = async (req, res, next) => {
 
       const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
+      // Save the new access token and refresh token
       user.hubspotAccessToken = access_token;
       user.hubspotRefreshToken = refresh_token;
       user.hubspotExpiresAt = new Date(Date.now() + expires_in * 1000);
       await user.save();
     }
 
-    next();
+    next(); // Proceed to the next middleware (fetch contacts)
   } catch (error) {
     res.status(500).json({ message: 'Failed to refresh HubSpot token' });
   }
 };
+

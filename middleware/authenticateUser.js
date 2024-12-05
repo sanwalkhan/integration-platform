@@ -1,7 +1,8 @@
+// middlewares/authenticateUser.js
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Ensure this import is correct
+const User = require('../models/User'); // Make sure this import is correct
 
- const authenticateUser = async (req, res, next) => {
+const authenticateUser = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', ''); // Extract token from headers
 
   if (!token) {

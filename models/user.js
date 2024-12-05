@@ -1,27 +1,40 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // bcryptjs for password hashing
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: function () { return !this.googleId && !this.microsoftId && !this.hubspotId; } },
-  googleId: { type: String },
-  microsoftId: { type: String },
-  hubspotId: { type: String }, // HubSpot User ID
-  hubspotAccessToken: { type: String }, // OAuth Access Token
-  hubspotRefreshToken: { type: String }, // OAuth Refresh Token
-  hubspotExpiresAt: { type: Date }, // Token Expiry
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  workEmail: { type: String, required: true, unique: true },
+  password: { type: String },
+  sapAuthToken: { type: String }, // SAP Auth Token
+  sapCompanyUUID: { type: String }, // SAP Company UUID
+  isEmailVerified: { type: Boolean, default: false },
+  hubspotAccessToken: String,
+  hubspotRefreshToken: String,
+  hubspotConnected: {
+    type: Boolean,
+    default: false
+  }
 }, { timestamps: true });
 
+// Method to compare password
+userSchema.methods.comparePassword = async function (password) {
+  try {
+    return await bcrypt.compare(password, this.password); // Compare plaintext password with hashed password
+  } catch (err) {
+    throw new Error('Error comparing passwords');
+  }
+};
+
+// Hash password before saving the user
 userSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
+    this.password = await bcrypt.hash(this.password, 10); // Hash password
   }
   next();
 });
 
-const User = mongoose.model('User', userSchema);
-module.exports = User;
+module.exports = mongoose.model('User', userSchema); // Export the User model
 
 
 

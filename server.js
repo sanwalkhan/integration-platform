@@ -7,7 +7,7 @@ const connectDB = require('./config/db');
 require('dotenv').config();
 require('./config/passport');
 const hubspotRoutes = require('./routes/hubspotRoutes');
-
+const sapRoutes = require('./routes/sapRoutes');
 
 
 
@@ -36,6 +36,7 @@ app.use(passport.session());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/hubspot', hubspotRoutes);
+app.use('/api/sap', sapRoutes);
 
 
 
